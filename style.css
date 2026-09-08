@@ -1,5 +1,7 @@
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 html,
@@ -8,7 +10,8 @@ body {
   min-height: 100%;
   background: #000;
   color: #fff;
-  touch-action: manipulation;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 body {
@@ -24,9 +27,9 @@ body {
 }
 
 header {
-  width: min(1180px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 18px 0 14px;
+  width: 100%;
+  margin: 0;
+  padding: 18px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -51,6 +54,7 @@ canvas {
   min-height: 0;
   background: #000;
   border: 1px solid #fff;
+  touch-action: none;
 }
 
 footer {
@@ -80,7 +84,9 @@ button {
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
-  touch-action: manipulation;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 button:active,
@@ -95,16 +101,27 @@ button:disabled {
 }
 
 .icon-button {
-  width: 36px;
-  height: 36px;
-  padding: 5px;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  padding: 4px;
+  margin-left: auto;
   border: 0;
+  background: #000;
+  color: #fff;
 }
 
 .icon-button svg {
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.icon-button[aria-pressed="true"] {
+  background: #000;
+  color: #fff;
 }
 
 #game {
@@ -113,6 +130,9 @@ button:disabled {
   z-index: 5;
   overflow: hidden;
   pointer-events: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 #game[hidden] {
@@ -173,6 +193,10 @@ button:disabled {
   transform-origin: 50% 55%;
 }
 
+#swatter.hitting {
+  transform: translate(-50%, -50%) rotate(-18deg) scale(0.92);
+}
+
 .swatter-head,
 .swatter-handle {
   position: absolute;
@@ -215,7 +239,7 @@ button:disabled {
 
 #joystick {
   position: absolute;
-  right: 18px;
+  left: 18px;
   bottom: 18px;
   width: 92px;
   height: 92px;
@@ -235,17 +259,36 @@ button:disabled {
   border: 1px solid #fff;
   border-radius: 50%;
   background: #000;
+  pointer-events: none;
+}
+
+#hit-button {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 92px;
+  height: 92px;
+  padding: 0;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  pointer-events: auto;
+  touch-action: none;
+  font-size: 12px;
+}
+
+#hit-button:active {
+  background: #fff;
+  color: #000;
 }
 
 @media (max-width: 720px) {
-  header,
   main,
   footer {
     width: calc(100% - 24px);
   }
 
   header {
-    padding: 14px 0 10px;
+    padding: 14px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
   }
 
   main {
@@ -264,15 +307,23 @@ button:disabled {
   }
 
   .icon-button {
-    width: 32px;
-    height: 32px;
-    padding: 4px;
+    width: 34px;
+    height: 34px;
+    padding: 3px;
   }
 
-  #joystick {
-    right: 12px;
+  #joystick,
+  #hit-button {
     bottom: 12px;
     width: 80px;
     height: 80px;
+  }
+
+  #joystick {
+    left: 12px;
+  }
+
+  #hit-button {
+    right: 12px;
   }
 }
