@@ -110,7 +110,7 @@ jobs:
           const wasm = fs.readFileSync('dist/engine.wasm');
           const { instance } = await WebAssembly.instantiate(wasm, {});
           const e = instance.exports;
-          for (const name of ['memory', 'fm_alloc', 'fm_free', 'fm_create', 'fm_render', 'fm_event_count', 'fm_event', 'fm_destroy']) {
+          for (const name of ['memory', 'fm_alloc', 'fm_free', 'fm_create', 'fm_set_tempo', 'fm_reset_neural', 'fm_render', 'fm_event_count', 'fm_event', 'fm_destroy']) {
             if (!e[name]) throw new Error(`missing WASM export: ${name}`);
           }
 
@@ -136,12 +136,14 @@ jobs:
           e.fm_free(graph.ptr, graph.length);
           if (!handle) throw new Error('fm_create failed');
 
+          e.fm_set_tempo(handle, 112);
+          e.fm_reset_neural(handle, 987654321);
           const outputPtr = e.fm_render(handle, 128);
           if (!outputPtr) throw new Error('fm_render failed');
           const output = new Float32Array(e.memory.buffer, outputPtr, 256);
           if (![...output].every(Number.isFinite)) throw new Error('non-finite audio sample');
           e.fm_destroy(handle);
-          console.log('WASM + connectome + SoundFont smoke test passed.');
+          console.log('WASM + connectome + SoundFont + tempo/reset smoke test passed.');
           JS
           du -h dist/engine.wasm dist/data/fly.bin dist/sf2/*.sf2
 
