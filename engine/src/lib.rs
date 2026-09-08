@@ -5,8 +5,9 @@ use std::sync::Arc;
 
 const MAX_EVENT_NODES: usize = 1024;
 const EVENT_LIMIT: usize = 32;
-const BASE_TEMPO_BPM: u32 = 84;
+const BASE_TEMPO_BPM: u32 = 120;
 const BASE_TICK_RATE: u32 = 60;
+const DRUM_CHANNEL: i32 = 9;
 
 struct Graph {
     hashes: Vec<u32>,
@@ -51,6 +52,7 @@ impl Rng {
 pub struct Engine {
     piano: Synthesizer,
     voice: Synthesizer,
+    drums: Synthesizer,
     hashes: Vec<u32>,
     offsets: Vec<u32>,
     destinations: Vec<u16>,
@@ -70,6 +72,8 @@ pub struct Engine {
     piano_right: Vec<f32>,
     voice_left: Vec<f32>,
     voice_right: Vec<f32>,
+    drum_left: Vec<f32>,
+    drum_right: Vec<f32>,
     output: Vec<f32>,
 }
 
@@ -77,6 +81,7 @@ impl Engine {
     fn new(
         piano_bytes: &[u8],
         voice_bytes: &[u8],
+        drum_bytes: &[u8],
         graph_bytes: &[u8],
         sample_rate: usize,
         seed: u32,
@@ -88,13 +93,17 @@ impl Engine {
 
         let mut piano_cursor = Cursor::new(piano_bytes);
         let mut voice_cursor = Cursor::new(voice_bytes);
+        let mut drum_cursor = Cursor::new(drum_bytes);
         let piano_font = Arc::new(SoundFont::new(&mut piano_cursor).ok()?);
         let voice_font = Arc::new(SoundFont::new(&mut voice_cursor).ok()?);
+        let drum_font = Arc::new(SoundFont::new(&mut drum_cursor).ok()?);
         let settings = SynthesizerSettings::new(sample_rate as i32);
         let mut piano = Synthesizer::new(&piano_font, &settings).ok()?;
         let mut voice = Synthesizer::new(&voice_font, &settings).ok()?;
-        piano.set_master_volume(0.72);
-        voice.set_master_volume(0.48);
+        let mut drums = Synthesizer::new(&drum_font, &settings).ok()?;
+        piano.set_master_volume(0.68);
+        voice.set_master_volume(0.44);
+        drums.set_master_volume(0.60);
 
         let node_count = graph.hashes.len();
         let mut rng = Rng::new(seed);
@@ -106,6 +115,7 @@ impl Engine {
         Some(Self {
             piano,
             voice,
+            drums,
             hashes: graph.hashes,
             offsets: graph.offsets,
             destinations: graph.destinations,
@@ -114,7 +124,7 @@ impl Engine {
             input: vec![0.0; node_count],
             refractory: vec![0; node_count],
             spikes: Vec::with_capacity(64),
-            active_notes: Vec::with_capacity(64),
+            active_notes: Vec::with_capacity(96),
             events: Vec::with_capacity(EVENT_LIMIT),
             rng,
             tick_counter: 0,
@@ -125,12 +135,14 @@ impl Engine {
             piano_right: vec![0.0; 128],
             voice_left: vec![0.0; 128],
             voice_right: vec![0.0; 128],
+            drum_left: vec![0.0; 128],
+            drum_right: vec![0.0; 128],
             output: vec![0.0; 256],
         })
     }
 
     fn set_tempo(&mut self, bpm: u32) {
-        let bpm = bpm.clamp(40, 200) as u64;
+        let bpm = bpm.clamp(40, 240) as u64;
         let numerator = self.sample_rate as u64 * BASE_TEMPO_BPM as u64;
         let denominator = BASE_TICK_RATE as u64 * bpm;
         self.tick_interval = ((numerator + denominator / 2) / denominator).max(1) as usize;
@@ -205,6 +217,26 @@ impl Engine {
         }
 
         let density = spike_count.min(16) as f32;
+
+        let drum_chance = (0.08 + density * 0.025).min(0.52);
+        if self.rng.next_f32() < drum_chance {
+            let node = self.spikes[(self.rng.next_u32() as usize) % spike_count];
+            let mixed = self.hashes[node]
+                ^ self.rng.next_u32().rotate_left((node as u32) & 31)
+                ^ (self.tick_counter as u32).rotate_right(5);
+            let drum_notes = [36, 38, 42, 46, 49, 39];
+            let note = drum_notes[(mixed as usize) % drum_notes.len()];
+            let velocity = 50 + (self.rng.next_u32() % 72) as i32;
+            self.trigger_note(2, node, note, velocity, 140);
+
+            if spike_count > 8 && self.rng.next_f32() < 0.12 && self.events.len() < EVENT_LIMIT {
+                let node2 = self.spikes[(self.rng.next_u32() as usize) % spike_count];
+                let note2 = if note == 42 { 36 } else { 42 };
+                let velocity2 = 42 + (self.rng.next_u32() % 60) as i32;
+                self.trigger_note(2, node2, note2, velocity2, 110);
+            }
+        }
+
         let piano_chance = (0.05 + density * 0.012).min(0.24);
         if self.rng.next_f32() < piano_chance {
             let mut note_count = 1usize;
@@ -244,14 +276,14 @@ impl Engine {
     }
 
     fn trigger_note(&mut self, kind: u8, node: usize, note: i32, velocity: i32, duration_ms: usize) {
-        if self.active_notes.len() >= 64 {
+        if self.active_notes.len() >= 96 || self.events.len() >= EVENT_LIMIT {
             return;
         }
 
-        if kind == 0 {
-            self.piano.note_on(0, note, velocity);
-        } else {
-            self.voice.note_on(0, note, velocity);
+        match kind {
+            0 => self.piano.note_on(0, note, velocity),
+            1 => self.voice.note_on(0, note, velocity),
+            _ => self.drums.note_on(DRUM_CHANNEL, note, velocity),
         }
 
         let remaining_samples = (duration_ms * self.sample_rate / 1000).max(1);
@@ -261,9 +293,10 @@ impl Engine {
             remaining_samples,
         });
 
+        let display_kind = u32::from(kind == 1);
         let duration_bucket = ((duration_ms + 49) / 50).clamp(1, 127) as u32;
         let packed = ((note as u32) & 0x7f)
-            | (((kind as u32) & 0x01) << 7)
+            | ((display_kind & 0x01) << 7)
             | (((node as u32) & 0x03ff) << 8)
             | (((velocity as u32) & 0x7f) << 18)
             | ((duration_bucket & 0x7f) << 25);
@@ -275,10 +308,10 @@ impl Engine {
         while index < self.active_notes.len() {
             if self.active_notes[index].remaining_samples <= frames {
                 let ended = self.active_notes.swap_remove(index);
-                if ended.kind == 0 {
-                    self.piano.note_off(0, ended.note);
-                } else {
-                    self.voice.note_off(0, ended.note);
+                match ended.kind {
+                    0 => self.piano.note_off(0, ended.note),
+                    1 => self.voice.note_off(0, ended.note),
+                    _ => self.drums.note_off(DRUM_CHANNEL, ended.note),
                 }
             } else {
                 self.active_notes[index].remaining_samples -= frames;
@@ -293,6 +326,8 @@ impl Engine {
             self.piano_right.resize(frames, 0.0);
             self.voice_left.resize(frames, 0.0);
             self.voice_right.resize(frames, 0.0);
+            self.drum_left.resize(frames, 0.0);
+            self.drum_right.resize(frames, 0.0);
         }
         let stereo = frames * 2;
         if self.output.len() < stereo {
@@ -319,10 +354,18 @@ impl Engine {
             &mut self.voice_left[..frames],
             &mut self.voice_right[..frames],
         );
+        self.drums.render(
+            &mut self.drum_left[..frames],
+            &mut self.drum_right[..frames],
+        );
 
         for i in 0..frames {
-            let left = self.piano_left[i] * 0.78 + self.voice_left[i] * 0.62;
-            let right = self.piano_right[i] * 0.78 + self.voice_right[i] * 0.62;
+            let left = self.piano_left[i] * 0.72
+                + self.voice_left[i] * 0.56
+                + self.drum_left[i] * 0.72;
+            let right = self.piano_right[i] * 0.72
+                + self.voice_right[i] * 0.56
+                + self.drum_right[i] * 0.72;
             self.output[i * 2] = soft_clip(left);
             self.output[i * 2 + 1] = soft_clip(right);
         }
@@ -437,6 +480,8 @@ pub unsafe extern "C" fn fm_create(
     piano_len: usize,
     voice_ptr: *const u8,
     voice_len: usize,
+    drum_ptr: *const u8,
+    drum_len: usize,
     graph_ptr: *const u8,
     graph_len: usize,
     sample_rate: u32,
@@ -444,9 +489,11 @@ pub unsafe extern "C" fn fm_create(
 ) -> *mut Engine {
     if piano_ptr.is_null()
         || voice_ptr.is_null()
+        || drum_ptr.is_null()
         || graph_ptr.is_null()
         || piano_len == 0
         || voice_len == 0
+        || drum_len == 0
         || graph_len == 0
         || sample_rate < 8_000
     {
@@ -455,9 +502,10 @@ pub unsafe extern "C" fn fm_create(
 
     let piano = slice::from_raw_parts(piano_ptr, piano_len);
     let voice = slice::from_raw_parts(voice_ptr, voice_len);
+    let drums = slice::from_raw_parts(drum_ptr, drum_len);
     let graph = slice::from_raw_parts(graph_ptr, graph_len);
 
-    match Engine::new(piano, voice, graph, sample_rate as usize, seed) {
+    match Engine::new(piano, voice, drums, graph, sample_rate as usize, seed) {
         Some(engine) => Box::into_raw(Box::new(engine)),
         None => std::ptr::null_mut(),
     }
