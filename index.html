@@ -8,21 +8,46 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <header>FlyMusic</header>
+  <header>
+    <span>FlyMusic</span>
+    <button id="game-toggle" class="icon-button" type="button" aria-label="Fly swatter game" aria-pressed="false">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <g transform="rotate(-45 16 16)" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square">
+          <rect x="9" y="4" width="14" height="11" rx="1"></rect>
+          <path d="M12 7h8M12 10h8M12 13h8M14 15v12M18 15v12M14 27h4"></path>
+        </g>
+      </svg>
+    </button>
+  </header>
 
-  <main>
+  <main id="stage">
     <canvas id="brain" aria-label="FlyWire brain map"></canvas>
     <canvas id="roll" aria-label="Piano roll"></canvas>
+
+    <div id="game" hidden aria-hidden="true">
+      <div id="fly" aria-hidden="true">
+        <span class="fly-wing left"></span>
+        <span class="fly-body"></span>
+        <span class="fly-wing right"></span>
+      </div>
+      <div id="swatter" aria-hidden="true">
+        <span class="swatter-head"></span>
+        <span class="swatter-handle"></span>
+      </div>
+      <div id="joystick" aria-label="Joystick">
+        <div id="stick"></div>
+      </div>
+    </div>
   </main>
 
   <footer>
     <div class="tempo" role="group" aria-label="Tempo">
-      <button class="tempo-button" type="button" data-bpm="84" aria-pressed="true">ANDANTE</button>
-      <button class="tempo-button" type="button" data-bpm="112" aria-pressed="false">MODERATO</button>
+      <button class="tempo-button" type="button" data-bpm="84" aria-pressed="true" data-i18n="slow">SLOW</button>
+      <button class="tempo-button" type="button" data-bpm="112" aria-pressed="false" data-i18n="fast">FAST</button>
     </div>
     <div class="transport">
-      <button id="play" type="button">PLAY</button>
-      <button id="stop" type="button">STOP</button>
+      <button id="play" type="button" data-i18n="play">PLAY</button>
+      <button id="stop" type="button" data-i18n="stop">STOP</button>
     </div>
   </footer>
 
