@@ -100,8 +100,49 @@ jobs:
           for name in ('dist/sf2/piano.sf2', 'dist/sf2/voice.sf2'):
               head = Path(name).read_bytes()[:12]
               assert head[:4] == b'RIFF' and head[8:12] == b'sfbk', name
-          print('Build validated.')
+          print('Static build validated.')
           PY
+          node --check dist/app.js
+          node --check dist/audio-worklet.js
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+
+          const wasm = fs.readFileSync('dist/engine.wasm');
+          const { instance } = await WebAssembly.instantiate(wasm, {});
+          const e = instance.exports;
+          for (const name of ['memory', 'fm_alloc', 'fm_free', 'fm_create', 'fm_render', 'fm_event_count', 'fm_event', 'fm_destroy']) {
+            if (!e[name]) throw new Error(`missing WASM export: ${name}`);
+          }
+
+          function copy(path) {
+            const bytes = fs.readFileSync(path);
+            const ptr = e.fm_alloc(bytes.length);
+            if (!ptr) throw new Error(`allocation failed: ${path}`);
+            new Uint8Array(e.memory.buffer, ptr, bytes.length).set(bytes);
+            return { ptr, length: bytes.length };
+          }
+
+          const piano = copy('dist/sf2/piano.sf2');
+          const voice = copy('dist/sf2/voice.sf2');
+          const graph = copy('dist/data/fly.bin');
+          const handle = e.fm_create(
+            piano.ptr, piano.length,
+            voice.ptr, voice.length,
+            graph.ptr, graph.length,
+            48000, 123456789,
+          );
+          e.fm_free(piano.ptr, piano.length);
+          e.fm_free(voice.ptr, voice.length);
+          e.fm_free(graph.ptr, graph.length);
+          if (!handle) throw new Error('fm_create failed');
+
+          const outputPtr = e.fm_render(handle, 128);
+          if (!outputPtr) throw new Error('fm_render failed');
+          const output = new Float32Array(e.memory.buffer, outputPtr, 256);
+          if (![...output].every(Number.isFinite)) throw new Error('non-finite audio sample');
+          e.fm_destroy(handle);
+          console.log('WASM + connectome + SoundFont smoke test passed.');
+          JS
           du -h dist/engine.wasm dist/data/fly.bin dist/sf2/*.sf2
 
       - name: Configure Pages
