@@ -4,6 +4,8 @@ const playButton = document.querySelector('#play');
 const stopButton = document.querySelector('#stop');
 const tempoButtons = [...document.querySelectorAll('.tempo-button')];
 const tempoDisplay = document.querySelector('#tempo-display');
+const startScreen = document.querySelector('#start-screen');
+const startButton = document.querySelector('#start-button');
 const gameToggle = document.querySelector('#game-toggle');
 const stage = document.querySelector('#stage');
 const game = document.querySelector('#game');
@@ -15,12 +17,12 @@ const hitButton = document.querySelector('#hit-button');
 
 const brainCtx = brainCanvas.getContext('2d');
 const rollCtx = rollCanvas.getContext('2d');
-const DATA_URL = new URL('./data/fly.bin?v=21', import.meta.url);
-const WASM_URL = new URL('./engine.wasm?v=21', import.meta.url);
-const PIANO_URL = new URL('./sf2/piano.sf2?v=21', import.meta.url);
-const VOICE_URL = new URL('./sf2/voice.sf2?v=21', import.meta.url);
-const DRUM_URL = new URL('./sf2/drums.sf2?v=21', import.meta.url);
-const WORKLET_URL = new URL('./audio-worklet.js?v=21', import.meta.url);
+const DATA_URL = new URL('./data/fly.bin?v=22', import.meta.url);
+const WASM_URL = new URL('./engine.wasm?v=22', import.meta.url);
+const PIANO_URL = new URL('./sf2/piano.sf2?v=22', import.meta.url);
+const VOICE_URL = new URL('./sf2/voice.sf2?v=22', import.meta.url);
+const DRUM_URL = new URL('./sf2/drums.sf2?v=22', import.meta.url);
+const WORKLET_URL = new URL('./audio-worklet.js?v=22', import.meta.url);
 
 let flyData = null;
 let activeUntil = new Float64Array(0);
@@ -49,13 +51,38 @@ stopButton.disabled = true;
 
 const japanese = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().startsWith('ja');
 const strings = japanese
-  ? { slower: '遅く', faster: '早く', play: '再生', stop: '停止', game: 'ハエ叩き', hit: '叩く' }
-  : { slower: 'SLOWER', faster: 'FASTER', play: 'PLAY', stop: 'STOP', game: 'Fly swatter', hit: 'HIT' };
+  ? {
+      intro: 'ショウジョウバエの脳の接続マップから音楽を生成します。',
+      start: 'タップでスタート',
+      slower: '遅く',
+      faster: '早く',
+      play: '再生',
+      stop: '停止',
+      game: 'ハエ叩き',
+      hit: '叩く',
+    }
+  : {
+      intro: 'Music generated from the mapped connections of a fruit fly brain.',
+      start: 'TAP TO START',
+      slower: 'SLOWER',
+      faster: 'FASTER',
+      play: 'PLAY',
+      stop: 'STOP',
+      game: 'Fly swatter',
+      hit: 'HIT',
+    };
 
 document.documentElement.lang = japanese ? 'ja' : 'en';
 for (const element of document.querySelectorAll('[data-i18n]')) {
   const key = element.dataset.i18n;
   if (strings[key]) element.textContent = strings[key];
+}
+for (const element of document.querySelectorAll('[data-i18n-label]')) {
+  const key = element.dataset.i18nLabel;
+  if (strings[key]) {
+    element.setAttribute('aria-label', strings[key]);
+    element.title = strings[key];
+  }
 }
 gameToggle.setAttribute('aria-label', strings.game);
 gameToggle.title = strings.game;
@@ -84,12 +111,13 @@ function updateTempoDisplay() {
 function setTempo(bpm) {
   tempoBpm = Math.max(40, Math.min(240, Math.round(bpm / 10) * 10));
   updateTempoDisplay();
-  if (audioNode) audioNode.port.postMessage({ type: 'tempo', bpm: tempoBpm });
+  if (audioNode) {
+    audioNode.port.postMessage({ type: 'tempo', bpm: tempoBpm });
+  }
 }
 
 for (const button of tempoButtons) {
-  button.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
+  button.addEventListener('click', () => {
     setTempo(tempoBpm + Number(button.dataset.delta || 0));
   });
 }
@@ -292,8 +320,7 @@ function setGameEnabled(enabled) {
   }
 }
 
-gameToggle.addEventListener('pointerdown', (event) => {
-  event.preventDefault();
+gameToggle.addEventListener('click', () => {
   setGameEnabled(!gameEnabled);
 });
 
@@ -438,7 +465,7 @@ async function initializeAudio() {
 
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    audioContext = new AudioContextClass({ latencyHint: 'interactive' });
+    audioContext = audioContext || new AudioContextClass({ latencyHint: 'interactive' });
 
     const unlock = audioContext.createBufferSource();
     unlock.buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
@@ -470,10 +497,13 @@ async function initializeAudio() {
         audioStarting = false;
         playButton.disabled = false;
         stopButton.disabled = false;
+        setTempo(tempoBpm);
       } else if (event.data?.type === 'error') {
         console.error(event.data.message || 'FlyMusic audio engine failed.');
         audioStarting = false;
         playButton.disabled = false;
+        startButton.disabled = false;
+        startScreen.hidden = false;
       }
     };
 
@@ -492,11 +522,20 @@ async function initializeAudio() {
     console.error(error);
     audioStarting = false;
     playButton.disabled = false;
+    startButton.disabled = false;
+    startScreen.hidden = false;
   }
 }
 
+startButton.addEventListener('click', () => {
+  if (audioStarting || audioReady) return;
+  startButton.disabled = true;
+  startScreen.hidden = true;
+  initializeAudio();
+});
+
 playButton.addEventListener('click', async () => {
-  if (!audioContext) {
+  if (!audioContext || !audioReady) {
     await initializeAudio();
     return;
   }
