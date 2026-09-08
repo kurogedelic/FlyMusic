@@ -17,12 +17,13 @@ const hitButton = document.querySelector('#hit-button');
 
 const brainCtx = brainCanvas.getContext('2d');
 const rollCtx = rollCanvas.getContext('2d');
-const DATA_URL = new URL('./data/fly.bin?v=22', import.meta.url);
-const WASM_URL = new URL('./engine.wasm?v=22', import.meta.url);
-const PIANO_URL = new URL('./sf2/piano.sf2?v=22', import.meta.url);
-const VOICE_URL = new URL('./sf2/voice.sf2?v=22', import.meta.url);
-const DRUM_URL = new URL('./sf2/drums.sf2?v=22', import.meta.url);
-const WORKLET_URL = new URL('./audio-worklet.js?v=22', import.meta.url);
+const ASSET_VERSION = '24';
+const DATA_URL = new URL(`./data/fly.bin?v=${ASSET_VERSION}`, import.meta.url);
+const WASM_URL = new URL(`./engine.wasm?v=${ASSET_VERSION}`, import.meta.url);
+const PIANO_URL = new URL(`./sf2/piano.sf2?v=${ASSET_VERSION}`, import.meta.url);
+const VOICE_URL = new URL(`./sf2/voice.sf2?v=${ASSET_VERSION}`, import.meta.url);
+const DRUM_URL = new URL(`./sf2/drums.sf2?v=${ASSET_VERSION}`, import.meta.url);
+const WORKLET_URL = new URL(`./audio-worklet.js?v=${ASSET_VERSION}`, import.meta.url);
 
 let flyData = null;
 let activeUntil = new Float64Array(0);
@@ -49,7 +50,9 @@ let lastHit = 0;
 
 stopButton.disabled = true;
 
-const japanese = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().startsWith('ja');
+const japanese = (navigator.languages?.[0] || navigator.language || 'en')
+  .toLowerCase()
+  .startsWith('ja');
 const strings = japanese
   ? {
       intro: 'ショウジョウバエの脳の接続マップから音楽を生成します。',
@@ -111,9 +114,7 @@ function updateTempoDisplay() {
 function setTempo(bpm) {
   tempoBpm = Math.max(40, Math.min(240, Math.round(bpm / 10) * 10));
   updateTempoDisplay();
-  if (audioNode) {
-    audioNode.port.postMessage({ type: 'tempo', bpm: tempoBpm });
-  }
+  if (audioNode) audioNode.port.postMessage({ type: 'tempo', bpm: tempoBpm });
 }
 
 for (const button of tempoButtons) {
@@ -130,19 +131,26 @@ function fetchArrayBuffer(url) {
   });
 }
 
-const flyDataPromise = fetchArrayBuffer(DATA_URL).then((buffer) => {
-  flyData = parseFlyData(buffer);
-  activeUntil = new Float64Array(flyData.nodeCount);
-  return buffer;
-}).catch((error) => {
-  console.error(error);
-  throw error;
-});
+const flyDataPromise = fetchArrayBuffer(DATA_URL)
+  .then((buffer) => {
+    flyData = parseFlyData(buffer);
+    activeUntil = new Float64Array(flyData.nodeCount);
+    return buffer;
+  })
+  .catch((error) => {
+    console.error(error);
+    throw error;
+  });
 
 function parseFlyData(buffer) {
   const view = new DataView(buffer);
   let offset = 0;
-  const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
+  const magic = String.fromCharCode(
+    view.getUint8(0),
+    view.getUint8(1),
+    view.getUint8(2),
+    view.getUint8(3),
+  );
   offset = 4;
   if (magic !== 'FLYM') throw new Error('Invalid FlyMusic data file.');
 
@@ -189,6 +197,7 @@ function parseFlyData(buffer) {
       }
     }
   }
+
   return { viz, nodes, lines, nodeCount };
 }
 
@@ -225,11 +234,12 @@ function renderBrain(now) {
   const h = brainCanvas.height;
   brainCtx.clearRect(0, 0, w, h);
   if (!flyData) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   brainCtx.strokeStyle = 'rgba(255,255,255,0.13)';
   brainCtx.lineWidth = Math.max(1, dpr * 0.5);
   brainCtx.beginPath();
+
   for (let i = 0; i < flyData.lines.length; i += 2) {
     const src = flyData.lines[i];
     const dst = flyData.lines[i + 1];
@@ -247,12 +257,17 @@ function renderBrain(now) {
     brainCtx.fillRect(Math.round(p[0]), Math.round(p[1]), dot, dot);
   }
 
-  brainCtx.fillStyle = '#fff';
   const nodeDot = Math.max(2, Math.round(dpr * 1.2));
+  brainCtx.fillStyle = '#fff';
   for (let node = 0; node < flyData.nodeCount; node += 1) {
     if (activeUntil[node] <= now) continue;
     const p = pointToCanvas(flyData.nodes[node * 2], flyData.nodes[node * 2 + 1], w, h);
-    brainCtx.fillRect(Math.round(p[0] - nodeDot), Math.round(p[1] - nodeDot), nodeDot * 2, nodeDot * 2);
+    brainCtx.fillRect(
+      Math.round(p[0] - nodeDot),
+      Math.round(p[1] - nodeDot),
+      nodeDot * 2,
+      nodeDot * 2,
+    );
   }
 }
 
@@ -265,13 +280,24 @@ function renderRoll(now) {
   const range = maxNote - minNote + 1;
   const rowH = h / range;
   const startWindow = now - windowMs;
+
   rollCtx.clearRect(0, 0, w, h);
   notes = notes.filter((event) => event.time + event.duration > startWindow);
 
   for (const event of notes) {
     const x = ((event.time - startWindow) / windowMs) * w;
-    const width = Math.max(2, (event.duration / windowMs) * w);
     const y = ((maxNote - event.note) / range) * h;
+
+    if (event.drum) {
+      const radius = Math.max(2, Math.min(6, rowH * 0.62));
+      rollCtx.fillStyle = '#fff';
+      rollCtx.beginPath();
+      rollCtx.arc(x, y + rowH * 0.5, radius, 0, Math.PI * 2);
+      rollCtx.fill();
+      continue;
+    }
+
+    const width = Math.max(2, (event.duration / windowMs) * w);
     const height = Math.max(2, rowH * 0.78);
     if (event.kind === 0) {
       rollCtx.fillStyle = '#fff';
@@ -320,9 +346,7 @@ function setGameEnabled(enabled) {
   }
 }
 
-gameToggle.addEventListener('click', () => {
-  setGameEnabled(!gameEnabled);
-});
+gameToggle.addEventListener('click', () => setGameEnabled(!gameEnabled));
 
 function updateJoystick(event) {
   event.preventDefault();
@@ -365,6 +389,7 @@ joystick.addEventListener('pointercancel', releaseJoystick);
 function performHit(event) {
   event?.preventDefault();
   if (!gameEnabled) return;
+
   const now = performance.now();
   if (now - lastHit < 180) return;
   lastHit = now;
@@ -404,9 +429,7 @@ function animateGame(now) {
     flyVx += (Math.random() - 0.5) * 0.035;
     flyVy += (Math.random() - 0.5) * 0.035;
     const speed = Math.hypot(flyVx, flyVy) || 0.001;
-    const maxSpeed = 0.115;
-    const minSpeed = 0.035;
-    const target = Math.max(minSpeed, Math.min(maxSpeed, speed));
+    const target = Math.max(0.035, Math.min(0.115, speed));
     flyVx = (flyVx / speed) * target;
     flyVy = (flyVy / speed) * target;
     nextFlyDrift = now + 800 + Math.random() * 1200;
@@ -415,14 +438,10 @@ function animateGame(now) {
   flyX += flyVx * dt;
   flyY += flyVy * dt;
 
-  const minX = 0.07;
-  const maxX = 0.93;
-  const minY = 0.07;
-  const maxY = 0.83;
-  if (flyX < minX) { flyX = minX; flyVx = Math.abs(flyVx); }
-  if (flyX > maxX) { flyX = maxX; flyVx = -Math.abs(flyVx); }
-  if (flyY < minY) { flyY = minY; flyVy = Math.abs(flyVy); }
-  if (flyY > maxY) { flyY = maxY; flyVy = -Math.abs(flyVy); }
+  if (flyX < 0.07) { flyX = 0.07; flyVx = Math.abs(flyVx); }
+  if (flyX > 0.93) { flyX = 0.93; flyVx = -Math.abs(flyVx); }
+  if (flyY < 0.07) { flyY = 0.07; flyVy = Math.abs(flyVy); }
+  if (flyY > 0.83) { flyY = 0.83; flyVy = -Math.abs(flyVy); }
 
   swatter.style.left = `${swatterX * 100}%`;
   swatter.style.top = `${swatterY * 100}%`;
@@ -452,9 +471,10 @@ function handleEvents(encodedEvents) {
     const velocity = (value >>> 18) & 0x7f;
     const durationBucket = (value >>> 25) & 0x7f;
     const duration = Math.max(50, durationBucket * 50);
+    const drum = kind === 0 && durationBucket <= 3;
 
     if (node < activeUntil.length) activeUntil[node] = now + 140;
-    notes.push({ time: now, note, kind, velocity, duration });
+    notes.push({ time: now, note, kind, velocity, duration, drum });
   }
 }
 
