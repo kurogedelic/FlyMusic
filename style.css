@@ -2,6 +2,10 @@
   box-sizing: border-box;
 }
 
+:root {
+  --panel-size: 320px;
+}
+
 html,
 body {
   margin: 0;
@@ -11,8 +15,11 @@ body {
 }
 
 body {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -27,16 +34,19 @@ header {
 
 main {
   width: min(1180px, calc(100% - 32px));
+  min-height: 0;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, var(--panel-size));
+  justify-content: center;
+  align-content: center;
   gap: 16px;
 }
 
 canvas {
   display: block;
-  width: 100%;
-  aspect-ratio: 1;
+  width: var(--panel-size);
+  height: var(--panel-size);
   background: #000;
   border: 1px solid #fff;
 }
@@ -45,6 +55,13 @@ footer {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 18px 0 max(22px, env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tempo,
+.transport {
   display: flex;
   gap: 10px;
 }
@@ -64,7 +81,8 @@ button {
   touch-action: manipulation;
 }
 
-button:active {
+button:active,
+button[aria-pressed="true"] {
   background: #fff;
   color: #000;
 }
@@ -86,7 +104,23 @@ button:disabled {
   }
 
   main {
-    grid-template-columns: 1fr;
+    grid-template-columns: var(--panel-size);
+    grid-template-rows: repeat(2, var(--panel-size));
     gap: 12px;
+  }
+
+  footer {
+    gap: 10px;
+  }
+
+  .tempo,
+  .transport {
+    gap: 6px;
+  }
+
+  button {
+    min-width: 0;
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }
