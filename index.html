@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
   <title>FlyMusic</title>
-  <link rel="stylesheet" href="./style.css?v=19">
+  <link rel="stylesheet" href="./style.css?v=20">
 </head>
 <body>
   <header>
-    <span>FlyMusic</span>
+    <span class="brand">FlyMusic</span>
+    <span id="tempo-display" aria-live="polite">♩ = 120</span>
     <button id="game-toggle" class="icon-button" type="button" aria-label="Fly swatter game" aria-pressed="false" title="Fly swatter game">
       <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-        <g transform="rotate(-45 16 16)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
+        <g transform="rotate(-45 16 16)" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter">
           <rect x="9" y="4" width="14" height="11"></rect>
           <path d="M12 7h8M12 10h8M12 13h8M16 15v13"></path>
         </g>
@@ -26,25 +27,34 @@
 
     <div id="game" hidden aria-hidden="true">
       <div id="fly" aria-hidden="true">
-        <span class="fly-wing left"></span>
-        <span class="fly-body"></span>
-        <span class="fly-wing right"></span>
+        <svg viewBox="0 0 44 34" focusable="false">
+          <g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="22" cy="18" rx="5.5" ry="9"></ellipse>
+            <circle cx="22" cy="8.2" r="3.4"></circle>
+            <path d="M17.5 15C10 7 4 7 3 12c-1 5 7 8 14 8M26.5 15C34 7 40 7 41 12c1 5-7 8-14 8"></path>
+            <path d="M18 19l-10 7M18.5 22l-7 9M26 19l10 7M25.5 22l7 9"></path>
+            <path d="M20 5L16 1M24 5l4-4"></path>
+            <path d="M18 16h8M18 20h8"></path>
+          </g>
+        </svg>
       </div>
+
       <div id="swatter" aria-hidden="true">
         <span class="swatter-head"></span>
         <span class="swatter-handle"></span>
       </div>
+
       <div id="joystick" aria-label="Joystick">
         <div id="stick"></div>
       </div>
-      <button id="hit-button" type="button" aria-label="Hit">HIT</button>
+      <button id="hit-button" type="button" aria-label="Hit" data-i18n="hit">HIT</button>
     </div>
   </main>
 
   <footer>
     <div class="tempo" role="group" aria-label="Tempo">
-      <button class="tempo-button" type="button" data-bpm="84" aria-pressed="true" data-i18n="slow">SLOW</button>
-      <button class="tempo-button" type="button" data-bpm="112" aria-pressed="false" data-i18n="fast">FAST</button>
+      <button class="tempo-button" type="button" data-delta="-10" data-i18n="slower">SLOWER</button>
+      <button class="tempo-button" type="button" data-delta="10" data-i18n="faster">FASTER</button>
     </div>
     <div class="transport">
       <button id="play" type="button" data-i18n="play">PLAY</button>
@@ -52,6 +62,6 @@
     </div>
   </footer>
 
-  <script type="module" src="./app.js?v=19"></script>
+  <script type="module" src="./app.js?v=20"></script>
 </body>
 </html>
