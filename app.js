@@ -15,12 +15,12 @@ const hitButton = document.querySelector('#hit-button');
 
 const brainCtx = brainCanvas.getContext('2d');
 const rollCtx = rollCanvas.getContext('2d');
-const DATA_URL = new URL('./data/fly.bin', import.meta.url);
-const WASM_URL = new URL('./engine.wasm', import.meta.url);
-const PIANO_URL = new URL('./sf2/piano.sf2', import.meta.url);
-const VOICE_URL = new URL('./sf2/voice.sf2', import.meta.url);
-const DRUM_URL = new URL('./sf2/drums.sf2', import.meta.url);
-const WORKLET_URL = new URL('./audio-worklet.js', import.meta.url);
+const DATA_URL = new URL('./data/fly.bin?v=21', import.meta.url);
+const WASM_URL = new URL('./engine.wasm?v=21', import.meta.url);
+const PIANO_URL = new URL('./sf2/piano.sf2?v=21', import.meta.url);
+const VOICE_URL = new URL('./sf2/voice.sf2?v=21', import.meta.url);
+const DRUM_URL = new URL('./sf2/drums.sf2?v=21', import.meta.url);
+const WORKLET_URL = new URL('./audio-worklet.js?v=21', import.meta.url);
 
 let flyData = null;
 let activeUntil = new Float64Array(0);
@@ -439,12 +439,14 @@ async function initializeAudio() {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     audioContext = new AudioContextClass({ latencyHint: 'interactive' });
-    const resumePromise = audioContext.resume();
 
-    await Promise.all([
-      resumePromise,
-      audioContext.audioWorklet.addModule(WORKLET_URL),
-    ]);
+    const unlock = audioContext.createBufferSource();
+    unlock.buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+    unlock.connect(audioContext.destination);
+    unlock.start(0);
+
+    await audioContext.resume();
+    await audioContext.audioWorklet.addModule(WORKLET_URL);
 
     const [wasmBuffer, pianoBuffer, voiceBuffer, drumBuffer, graphBuffer] = await Promise.all([
       fetchArrayBuffer(WASM_URL),
@@ -493,8 +495,7 @@ async function initializeAudio() {
   }
 }
 
-playButton.addEventListener('pointerdown', async (event) => {
-  event.preventDefault();
+playButton.addEventListener('click', async () => {
   if (!audioContext) {
     await initializeAudio();
     return;
@@ -508,8 +509,7 @@ playButton.addEventListener('pointerdown', async (event) => {
   }
 });
 
-stopButton.addEventListener('pointerdown', async (event) => {
-  event.preventDefault();
+stopButton.addEventListener('click', async () => {
   if (!audioContext) return;
   try {
     await audioContext.suspend();
