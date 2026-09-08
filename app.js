@@ -3,9 +3,13 @@ const rollCanvas = document.querySelector('#roll');
 const playButton = document.querySelector('#play');
 const stopButton = document.querySelector('#stop');
 const tempoButtons = [...document.querySelectorAll('.tempo-button')];
-const pageHeader = document.querySelector('header');
-const pageMain = document.querySelector('main');
-const pageFooter = document.querySelector('footer');
+const gameToggle = document.querySelector('#game-toggle');
+const stage = document.querySelector('#stage');
+const game = document.querySelector('#game');
+const fly = document.querySelector('#fly');
+const swatter = document.querySelector('#swatter');
+const joystick = document.querySelector('#joystick');
+const stick = document.querySelector('#stick');
 
 const brainCtx = brainCanvas.getContext('2d');
 const rollCtx = rollCanvas.getContext('2d');
@@ -25,7 +29,33 @@ let audioReady = false;
 let audioStarting = false;
 let tempoBpm = 84;
 
+let gameEnabled = false;
+let joystickPointer = null;
+let joystickX = 0;
+let joystickY = 0;
+let swatterX = 0.5;
+let swatterY = 0.5;
+let flyX = 0.3;
+let flyY = 0.3;
+let flyTargetX = 0.7;
+let flyTargetY = 0.35;
+let nextFlyTurn = 0;
+let lastGameFrame = performance.now();
+let lastHit = 0;
+
 stopButton.disabled = true;
+
+const japanese = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().startsWith('ja');
+const strings = japanese
+  ? { slow: '遅い', fast: '速い', play: '再生', stop: '停止', game: 'ハエ叩き' }
+  : { slow: 'SLOW', fast: 'FAST', play: 'PLAY', stop: 'STOP', game: 'Fly swatter' };
+
+document.documentElement.lang = japanese ? 'ja' : 'en';
+for (const element of document.querySelectorAll('[data-i18n]')) {
+  const key = element.dataset.i18n;
+  if (strings[key]) element.textContent = strings[key];
+}
+gameToggle.setAttribute('aria-label', strings.game);
 
 function setTempo(bpm) {
   tempoBpm = bpm;
@@ -38,30 +68,6 @@ function setTempo(bpm) {
 for (const button of tempoButtons) {
   button.addEventListener('click', () => setTempo(Number(button.dataset.bpm)));
 }
-
-function updatePanelSize() {
-  const stacked = window.matchMedia('(max-width: 720px)').matches;
-  const styles = getComputedStyle(pageMain);
-  const gap = parseFloat(styles.gap) || 0;
-  const viewportHeight = window.visualViewport?.height || window.innerHeight;
-  const availableHeight = Math.max(
-    1,
-    viewportHeight - pageHeader.getBoundingClientRect().height - pageFooter.getBoundingClientRect().height - (stacked ? gap : 0),
-  );
-  const heightLimit = availableHeight / 2;
-  const widthLimit = stacked
-    ? pageMain.clientWidth
-    : Math.max(1, (pageMain.clientWidth - gap) / 2);
-  const size = Math.max(1, Math.floor(Math.min(heightLimit, widthLimit)));
-  document.documentElement.style.setProperty('--panel-size', `${size}px`);
-}
-
-window.addEventListener('resize', updatePanelSize);
-window.visualViewport?.addEventListener('resize', updatePanelSize);
-const layoutObserver = new ResizeObserver(updatePanelSize);
-layoutObserver.observe(pageHeader);
-layoutObserver.observe(pageFooter);
-updatePanelSize();
 
 function fetchArrayBuffer(url) {
   return fetch(url).then((response) => {
@@ -238,6 +244,116 @@ function renderRoll(now) {
   }
 }
 
+function randomSeed() {
+  const seed = new Uint32Array(1);
+  crypto.getRandomValues(seed);
+  return seed[0];
+}
+
+function resetBrain() {
+  activeUntil.fill(0);
+  if (audioNode) audioNode.port.postMessage({ type: 'reset', seed: randomSeed() });
+}
+
+function setGameEnabled(enabled) {
+  gameEnabled = enabled;
+  game.hidden = !enabled;
+  game.setAttribute('aria-hidden', String(!enabled));
+  gameToggle.setAttribute('aria-pressed', String(enabled));
+  joystickX = 0;
+  joystickY = 0;
+  stick.style.transform = '';
+  if (enabled) {
+    swatterX = 0.5;
+    swatterY = 0.5;
+    flyX = 0.25 + Math.random() * 0.5;
+    flyY = 0.15 + Math.random() * 0.55;
+    nextFlyTurn = 0;
+  }
+}
+
+gameToggle.addEventListener('click', () => setGameEnabled(!gameEnabled));
+
+function updateJoystick(event) {
+  const rect = joystick.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = event.clientX - cx;
+  const dy = event.clientY - cy;
+  const radius = rect.width * 0.34;
+  const distance = Math.hypot(dx, dy) || 1;
+  const scale = Math.min(1, radius / distance);
+  const x = dx * scale;
+  const y = dy * scale;
+  joystickX = x / radius;
+  joystickY = y / radius;
+  stick.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+joystick.addEventListener('pointerdown', (event) => {
+  joystickPointer = event.pointerId;
+  joystick.setPointerCapture(event.pointerId);
+  updateJoystick(event);
+});
+
+joystick.addEventListener('pointermove', (event) => {
+  if (event.pointerId === joystickPointer) updateJoystick(event);
+});
+
+function releaseJoystick(event) {
+  if (event.pointerId !== joystickPointer) return;
+  joystickPointer = null;
+  joystickX = 0;
+  joystickY = 0;
+  stick.style.transform = '';
+}
+
+joystick.addEventListener('pointerup', releaseJoystick);
+joystick.addEventListener('pointercancel', releaseJoystick);
+
+function animateGame(now) {
+  if (!gameEnabled) {
+    lastGameFrame = now;
+    return;
+  }
+
+  const dt = Math.min(0.05, Math.max(0, (now - lastGameFrame) / 1000));
+  lastGameFrame = now;
+  const rect = stage.getBoundingClientRect();
+  const speedX = rect.width > 0 ? 220 / rect.width : 0;
+  const speedY = rect.height > 0 ? 220 / rect.height : 0;
+
+  swatterX = Math.max(0.03, Math.min(0.97, swatterX + joystickX * speedX * dt));
+  swatterY = Math.max(0.05, Math.min(0.92, swatterY + joystickY * speedY * dt));
+
+  if (now >= nextFlyTurn) {
+    flyTargetX = 0.06 + Math.random() * 0.88;
+    flyTargetY = 0.06 + Math.random() * 0.72;
+    nextFlyTurn = now + 500 + Math.random() * 1100;
+  }
+
+  const flyFollow = Math.min(1, dt * 2.6);
+  flyX += (flyTargetX - flyX) * flyFollow;
+  flyY += (flyTargetY - flyY) * flyFollow;
+
+  swatter.style.left = `${swatterX * 100}%`;
+  swatter.style.top = `${swatterY * 100}%`;
+  fly.style.left = `${flyX * 100}%`;
+  fly.style.top = `${flyY * 100}%`;
+
+  const dx = (swatterX - flyX) * rect.width;
+  const dy = (swatterY - flyY) * rect.height;
+  if (now - lastHit > 450 && Math.hypot(dx, dy) < 28) {
+    lastHit = now;
+    resetBrain();
+    flyX = 0.08 + Math.random() * 0.84;
+    flyY = 0.08 + Math.random() * 0.68;
+    flyTargetX = 0.08 + Math.random() * 0.84;
+    flyTargetY = 0.08 + Math.random() * 0.68;
+    nextFlyTurn = now + 700;
+  }
+}
+
 let lastFrame = 0;
 function animate(now) {
   if (now - lastFrame >= 32) {
@@ -245,6 +361,7 @@ function animate(now) {
     renderBrain(now);
     renderRoll(now);
   }
+  animateGame(now);
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
@@ -310,15 +427,13 @@ async function initializeAudio() {
 
     audioNode.connect(audioContext.destination);
 
-    const seedArray = new Uint32Array(1);
-    crypto.getRandomValues(seedArray);
     audioNode.port.postMessage({
       type: 'init',
       wasm: wasmBuffer,
       piano: pianoBuffer,
       voice: voiceBuffer,
       graph: graphBuffer,
-      seed: seedArray[0],
+      seed: randomSeed(),
       bpm: tempoBpm,
     }, [wasmBuffer, pianoBuffer, voiceBuffer, graphBuffer]);
   } catch (error) {
