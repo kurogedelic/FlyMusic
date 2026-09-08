@@ -4,9 +4,19 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
     this.wasm = null;
     this.handle = 0;
     this.ready = false;
+    this.bpm = 84;
     this.port.onmessage = (event) => {
       if (event.data?.type === 'init') this.initialize(event.data);
+      if (event.data?.type === 'tempo') this.setTempo(event.data.bpm);
     };
+  }
+
+  setTempo(bpm) {
+    const value = Math.max(40, Math.min(200, Math.round(Number(bpm) || 84)));
+    this.bpm = value;
+    if (this.ready && this.wasm?.fm_set_tempo && this.handle) {
+      this.wasm.fm_set_tempo(this.handle, value);
+    }
   }
 
   async initialize(data) {
@@ -14,7 +24,7 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
       const result = await WebAssembly.instantiate(data.wasm, {});
       this.wasm = result.instance.exports;
 
-      if (!this.wasm.memory || !this.wasm.fm_alloc || !this.wasm.fm_create) {
+      if (!this.wasm.memory || !this.wasm.fm_alloc || !this.wasm.fm_create || !this.wasm.fm_set_tempo) {
         throw new Error('FlyMusic WASM exports are incomplete.');
       }
 
@@ -39,6 +49,8 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
 
       if (!this.handle) throw new Error('FlyMusic engine initialization failed.');
 
+      this.bpm = Math.max(40, Math.min(200, Math.round(Number(data.bpm) || this.bpm)));
+      this.wasm.fm_set_tempo(this.handle, this.bpm);
       this.ready = true;
       this.port.postMessage({ type: 'ready' });
     } catch (error) {
