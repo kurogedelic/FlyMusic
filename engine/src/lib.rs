@@ -460,7 +460,8 @@ pub unsafe extern "C" fn fm_event_count(engine: *const Engine) -> usize {
     if engine.is_null() {
         return 0;
     }
-    (*engine).events.len()
+    let engine = &*engine;
+    engine.events.len()
 }
 
 #[no_mangle]
@@ -468,5 +469,6 @@ pub unsafe extern "C" fn fm_event(engine: *const Engine, index: usize) -> u32 {
     if engine.is_null() {
         return 0;
     }
-    (*engine).events.get(index).copied().unwrap_or(0)
+    let engine = &*engine;
+    engine.events.get(index).copied().unwrap_or(0)
 }
