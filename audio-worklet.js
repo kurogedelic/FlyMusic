@@ -8,6 +8,7 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (event) => {
       if (event.data?.type === 'init') this.initialize(event.data);
       if (event.data?.type === 'tempo') this.setTempo(event.data.bpm);
+      if (event.data?.type === 'reset') this.resetNeural(event.data.seed);
     };
   }
 
@@ -19,12 +20,24 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
     }
   }
 
+  resetNeural(seed) {
+    if (this.ready && this.wasm?.fm_reset_neural && this.handle) {
+      this.wasm.fm_reset_neural(this.handle, Number(seed) >>> 0);
+    }
+  }
+
   async initialize(data) {
     try {
       const result = await WebAssembly.instantiate(data.wasm, {});
       this.wasm = result.instance.exports;
 
-      if (!this.wasm.memory || !this.wasm.fm_alloc || !this.wasm.fm_create || !this.wasm.fm_set_tempo) {
+      if (
+        !this.wasm.memory
+        || !this.wasm.fm_alloc
+        || !this.wasm.fm_create
+        || !this.wasm.fm_set_tempo
+        || !this.wasm.fm_reset_neural
+      ) {
         throw new Error('FlyMusic WASM exports are incomplete.');
       }
 
