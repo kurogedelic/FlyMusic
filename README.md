@@ -1,6 +1,6 @@
 # FlyMusic
 
-FlyMusic turns the publicly released FlyWire FAFB v783 fruit-fly connectome into an endless stream of sound in the browser. A lightweight recurrent activity model follows directed, weighted FlyWire connections in WebAssembly. Neural events are mapped directly to note onsets for two SoundFont voices: piano and choir. No scale, chord progression, melody, or beat grid is imposed.
+FlyMusic turns the publicly released FlyWire FAFB v783 fruit-fly connectome into an endless stream of sound in the browser. A lightweight recurrent activity model follows directed, weighted FlyWire connections in WebAssembly. Neural events are mapped directly to piano, choir, and drum SoundFont voices. No scale, chord progression, melody, or beat grid is imposed.
 
 ## Data
 
@@ -22,6 +22,7 @@ The recurrent activity model is a generative model layered on measured anatomy. 
 - RustySynth 1.3.6: MIT License — https://github.com/sinshu/rustysynth
 - FreePats FM Synthesized Piano #2: CC0 1.0 — https://freepats.zenvoid.org/ElectricPiano/synthesized-piano.html
 - FreePats Synth Pad Choir: CC0 1.0 — https://freepats.zenvoid.org/Synthesizer/synth-pad.html
+- FreePats Synthesizer Percussion: CC0 1.0 — https://freepats.zenvoid.org/Percussion/electric-percussion.html
 
 ## Copyright
 
