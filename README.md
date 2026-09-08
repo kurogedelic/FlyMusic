@@ -20,7 +20,6 @@ The recurrent activity model is a generative model layered on measured anatomy. 
 - FlyMusic source code: MIT License.
 - FlyWire-derived build data: CC BY-NC 4.0.
 - RustySynth 1.3.6: MIT License — https://github.com/sinshu/rustysynth
-- Ionicons 8.1.0: MIT License — https://github.com/ionic-team/ionicons
 - FreePats FM Synthesized Piano #2: CC0 1.0 — https://freepats.zenvoid.org/ElectricPiano/synthesized-piano.html
 - FreePats Synth Pad Choir: CC0 1.0 — https://freepats.zenvoid.org/Synthesizer/synth-pad.html
 - FreePats Synthesizer Percussion: CC0 1.0 — https://freepats.zenvoid.org/Percussion/electric-percussion.html
