@@ -26,6 +26,44 @@ body {
   user-select: none;
 }
 
+#start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  background: #000;
+  color: #fff;
+}
+
+#start-screen[hidden] {
+  display: none;
+}
+
+.start-content {
+  width: min(420px, 100%);
+  text-align: center;
+}
+
+.start-content h1 {
+  margin: 0 0 18px;
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.start-content p {
+  margin: 0 auto 28px;
+  max-width: 340px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#start-button {
+  min-width: 180px;
+  padding: 12px 18px;
+}
+
 header {
   width: 100%;
   margin: 0;
@@ -109,6 +147,20 @@ button:active {
 button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.control-icon {
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  padding: 7px;
+}
+
+.control-icon ion-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+  pointer-events: none;
 }
 
 .icon-button {
@@ -285,6 +337,17 @@ button:disabled {
     padding-left: 4px;
     padding-right: 4px;
     font-size: 10px;
+  }
+
+  .control-icon {
+    min-height: 38px;
+    padding: 6px;
+  }
+
+  .control-icon ion-icon {
+    width: 19px;
+    height: 19px;
+    font-size: 19px;
   }
 
   .icon-button {
