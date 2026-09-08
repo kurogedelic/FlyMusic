@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache
-          key: flymusic-fafb783-freepats-v1
+          key: flymusic-fafb783-freepats-v2
 
       - name: Install archive tool
         run: |
@@ -58,7 +58,7 @@ jobs:
 
       - name: Download CC0 SoundFonts
         run: |
-          mkdir -p .cache/sf2/piano .cache/sf2/voice dist/sf2
+          mkdir -p .cache/sf2/piano .cache/sf2/voice .cache/sf2/drums dist/sf2
           if ! find .cache/sf2/piano -type f -iname '*.sf2' -print -quit | grep -q .; then
             curl --fail --location --retry 3 \
               https://github.com/freepats/fm-piano2/releases/download/2016-11-12/FM-Piano2-SF2-20161112.7z \
@@ -71,8 +71,15 @@ jobs:
               --output .cache/voice.7z
             7z e -y .cache/voice.7z -o.cache/sf2/voice '*.sf2' -r
           fi
+          if ! find .cache/sf2/drums -type f -iname '*.sf2' -print -quit | grep -q .; then
+            curl --fail --location --retry 3 \
+              https://freepats.zenvoid.org/Percussion/SynthesizerPercussion/SynthesizerPercussion-SF2-20220718.7z \
+              --output .cache/drums.7z
+            7z e -y .cache/drums.7z -o.cache/sf2/drums '*.sf2' -r
+          fi
           cp "$(find .cache/sf2/piano -type f -iname '*.sf2' -print -quit)" dist/sf2/piano.sf2
           cp "$(find .cache/sf2/voice -type f -iname '*.sf2' -print -quit)" dist/sf2/voice.sf2
+          cp "$(find .cache/sf2/drums -type f -iname '*.sf2' -print -quit)" dist/sf2/drums.sf2
 
       - name: Build WASM engine
         run: |
@@ -90,14 +97,15 @@ jobs:
           from pathlib import Path
           required = [
               'dist/index.html', 'dist/style.css', 'dist/app.js', 'dist/audio-worklet.js',
-              'dist/engine.wasm', 'dist/data/fly.bin', 'dist/sf2/piano.sf2', 'dist/sf2/voice.sf2',
+              'dist/engine.wasm', 'dist/data/fly.bin',
+              'dist/sf2/piano.sf2', 'dist/sf2/voice.sf2', 'dist/sf2/drums.sf2',
           ]
           for name in required:
               path = Path(name)
               assert path.is_file() and path.stat().st_size > 0, name
           assert Path('dist/engine.wasm').read_bytes()[:4] == b'\0asm'
           assert Path('dist/data/fly.bin').read_bytes()[:4] == b'FLYM'
-          for name in ('dist/sf2/piano.sf2', 'dist/sf2/voice.sf2'):
+          for name in ('dist/sf2/piano.sf2', 'dist/sf2/voice.sf2', 'dist/sf2/drums.sf2'):
               head = Path(name).read_bytes()[:12]
               assert head[:4] == b'RIFF' and head[8:12] == b'sfbk', name
           print('Static build validated.')
@@ -124,26 +132,29 @@ jobs:
 
           const piano = copy('dist/sf2/piano.sf2');
           const voice = copy('dist/sf2/voice.sf2');
+          const drums = copy('dist/sf2/drums.sf2');
           const graph = copy('dist/data/fly.bin');
           const handle = e.fm_create(
             piano.ptr, piano.length,
             voice.ptr, voice.length,
+            drums.ptr, drums.length,
             graph.ptr, graph.length,
             48000, 123456789,
           );
           e.fm_free(piano.ptr, piano.length);
           e.fm_free(voice.ptr, voice.length);
+          e.fm_free(drums.ptr, drums.length);
           e.fm_free(graph.ptr, graph.length);
           if (!handle) throw new Error('fm_create failed');
 
-          e.fm_set_tempo(handle, 112);
+          e.fm_set_tempo(handle, 130);
           e.fm_reset_neural(handle, 987654321);
           const outputPtr = e.fm_render(handle, 128);
           if (!outputPtr) throw new Error('fm_render failed');
           const output = new Float32Array(e.memory.buffer, outputPtr, 256);
           if (![...output].every(Number.isFinite)) throw new Error('non-finite audio sample');
           e.fm_destroy(handle);
-          console.log('WASM + connectome + SoundFont + tempo/reset smoke test passed.');
+          console.log('WASM + connectome + 3 SoundFonts + live tempo/reset smoke test passed.');
           JS
           du -h dist/engine.wasm dist/data/fly.bin dist/sf2/*.sf2
 
