@@ -149,12 +149,24 @@ jobs:
 
           e.fm_set_tempo(handle, 130);
           e.fm_reset_neural(handle, 987654321);
-          const outputPtr = e.fm_render(handle, 128);
-          if (!outputPtr) throw new Error('fm_render failed');
-          const output = new Float32Array(e.memory.buffer, outputPtr, 256);
-          if (![...output].every(Number.isFinite)) throw new Error('non-finite audio sample');
+
+          let eventCount = 0;
+          let peak = 0;
+          for (let block = 0; block < 1600; block += 1) {
+            const outputPtr = e.fm_render(handle, 128);
+            if (!outputPtr) throw new Error(`fm_render failed at block ${block}`);
+            const output = new Float32Array(e.memory.buffer, outputPtr, 256);
+            for (const sample of output) {
+              if (!Number.isFinite(sample)) throw new Error('non-finite audio sample');
+              peak = Math.max(peak, Math.abs(sample));
+            }
+            eventCount += e.fm_event_count(handle) >>> 0;
+          }
+
+          if (eventCount <= 0) throw new Error('no neural music events generated');
+          if (peak <= 1e-6) throw new Error('audio output stayed silent');
           e.fm_destroy(handle);
-          console.log('WASM + connectome + 3 SoundFonts + live tempo/reset smoke test passed.');
+          console.log(`Live render passed: events=${eventCount}, peak=${peak.toFixed(6)}`);
           JS
           du -h dist/engine.wasm dist/data/fly.bin dist/sf2/*.sf2
 
