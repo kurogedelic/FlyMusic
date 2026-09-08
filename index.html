@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
   <title>FlyMusic</title>
-  <link rel="stylesheet" href="./style.css?v=22">
+  <link rel="stylesheet" href="./style.css?v=23">
 </head>
 <body>
   <div id="start-screen" role="dialog" aria-modal="true" aria-labelledby="start-title">
@@ -61,25 +61,15 @@
 
   <footer>
     <div class="tempo" role="group" aria-label="Tempo">
-      <button class="tempo-button control-icon" type="button" data-delta="-10" data-i18n-label="slower" aria-label="Slower">
-        <ion-icon name="play-back" aria-hidden="true"></ion-icon>
-      </button>
-      <button class="tempo-button control-icon" type="button" data-delta="10" data-i18n-label="faster" aria-label="Faster">
-        <ion-icon name="play-forward" aria-hidden="true"></ion-icon>
-      </button>
+      <button class="tempo-button control-icon" type="button" data-delta="-10" data-i18n-label="slower" aria-label="Slower"><span aria-hidden="true">−10</span></button>
+      <button class="tempo-button control-icon" type="button" data-delta="10" data-i18n-label="faster" aria-label="Faster"><span aria-hidden="true">+10</span></button>
     </div>
     <div class="transport">
-      <button id="play" class="control-icon" type="button" data-i18n-label="play" aria-label="Play">
-        <ion-icon name="play" aria-hidden="true"></ion-icon>
-      </button>
-      <button id="stop" class="control-icon" type="button" data-i18n-label="stop" aria-label="Stop">
-        <ion-icon name="stop" aria-hidden="true"></ion-icon>
-      </button>
+      <button id="play" class="control-icon" type="button" data-i18n-label="play" aria-label="Play"><span aria-hidden="true">▶</span></button>
+      <button id="stop" class="control-icon" type="button" data-i18n-label="stop" aria-label="Stop"><span aria-hidden="true">■</span></button>
     </div>
   </footer>
 
-  <script type="module" src="https://esm.sh/ionicons@8.1.0/loader"></script>
-  <script nomodule src="https://esm.sh/ionicons@8.1.0/loader"></script>
-  <script type="module" src="./app.js?v=22"></script>
+  <script type="module" src="./app.js?v=23"></script>
 </body>
 </html>
