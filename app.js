@@ -2,6 +2,10 @@ const brainCanvas = document.querySelector('#brain');
 const rollCanvas = document.querySelector('#roll');
 const playButton = document.querySelector('#play');
 const stopButton = document.querySelector('#stop');
+const tempoButtons = [...document.querySelectorAll('.tempo-button')];
+const pageHeader = document.querySelector('header');
+const pageMain = document.querySelector('main');
+const pageFooter = document.querySelector('footer');
 
 const brainCtx = brainCanvas.getContext('2d');
 const rollCtx = rollCanvas.getContext('2d');
@@ -19,8 +23,45 @@ let audioContext = null;
 let audioNode = null;
 let audioReady = false;
 let audioStarting = false;
+let tempoBpm = 84;
 
 stopButton.disabled = true;
+
+function setTempo(bpm) {
+  tempoBpm = bpm;
+  for (const button of tempoButtons) {
+    button.setAttribute('aria-pressed', String(Number(button.dataset.bpm) === bpm));
+  }
+  if (audioNode) audioNode.port.postMessage({ type: 'tempo', bpm });
+}
+
+for (const button of tempoButtons) {
+  button.addEventListener('click', () => setTempo(Number(button.dataset.bpm)));
+}
+
+function updatePanelSize() {
+  const stacked = window.matchMedia('(max-width: 720px)').matches;
+  const styles = getComputedStyle(pageMain);
+  const gap = parseFloat(styles.gap) || 0;
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const availableHeight = Math.max(
+    1,
+    viewportHeight - pageHeader.getBoundingClientRect().height - pageFooter.getBoundingClientRect().height - (stacked ? gap : 0),
+  );
+  const heightLimit = availableHeight / 2;
+  const widthLimit = stacked
+    ? pageMain.clientWidth
+    : Math.max(1, (pageMain.clientWidth - gap) / 2);
+  const size = Math.max(1, Math.floor(Math.min(heightLimit, widthLimit)));
+  document.documentElement.style.setProperty('--panel-size', `${size}px`);
+}
+
+window.addEventListener('resize', updatePanelSize);
+window.visualViewport?.addEventListener('resize', updatePanelSize);
+const layoutObserver = new ResizeObserver(updatePanelSize);
+layoutObserver.observe(pageHeader);
+layoutObserver.observe(pageFooter);
+updatePanelSize();
 
 function fetchArrayBuffer(url) {
   return fetch(url).then((response) => {
@@ -278,6 +319,7 @@ async function initializeAudio() {
       voice: voiceBuffer,
       graph: graphBuffer,
       seed: seedArray[0],
+      bpm: tempoBpm,
     }, [wasmBuffer, pianoBuffer, voiceBuffer, graphBuffer]);
   } catch (error) {
     console.error(error);
