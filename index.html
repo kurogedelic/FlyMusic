@@ -16,8 +16,14 @@
   </main>
 
   <footer>
-    <button id="play" type="button">PLAY</button>
-    <button id="stop" type="button">STOP</button>
+    <div class="tempo" role="group" aria-label="Tempo">
+      <button class="tempo-button" type="button" data-bpm="84" aria-pressed="true">ANDANTE</button>
+      <button class="tempo-button" type="button" data-bpm="112" aria-pressed="false">MODERATO</button>
+    </div>
+    <div class="transport">
+      <button id="play" type="button">PLAY</button>
+      <button id="stop" type="button">STOP</button>
+    </div>
   </footer>
 
   <script type="module" src="./app.js"></script>
