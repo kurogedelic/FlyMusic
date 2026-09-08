@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 const MAX_EVENT_NODES: usize = 1024;
 const EVENT_LIMIT: usize = 32;
+const BASE_TEMPO_BPM: u32 = 84;
+const BASE_TICK_RATE: u32 = 60;
 
 struct Graph {
     hashes: Vec<u32>,
@@ -116,7 +118,7 @@ impl Engine {
             events: Vec::with_capacity(EVENT_LIMIT),
             rng,
             tick_counter: 0,
-            tick_interval: (sample_rate / 60).max(1),
+            tick_interval: (sample_rate / BASE_TICK_RATE as usize).max(1),
             tick_accumulator: 0,
             sample_rate,
             piano_left: vec![0.0; 128],
@@ -125,6 +127,14 @@ impl Engine {
             voice_right: vec![0.0; 128],
             output: vec![0.0; 256],
         })
+    }
+
+    fn set_tempo(&mut self, bpm: u32) {
+        let bpm = bpm.clamp(40, 200) as u64;
+        let numerator = self.sample_rate as u64 * BASE_TEMPO_BPM as u64;
+        let denominator = BASE_TICK_RATE as u64 * bpm;
+        self.tick_interval = ((numerator + denominator / 2) / denominator).max(1) as usize;
+        self.tick_accumulator = self.tick_accumulator.min(self.tick_interval.saturating_sub(1));
     }
 
     fn tick(&mut self) {
@@ -445,6 +455,15 @@ pub unsafe extern "C" fn fm_destroy(engine: *mut Engine) {
     if !engine.is_null() {
         drop(Box::from_raw(engine));
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_set_tempo(engine: *mut Engine, bpm: u32) {
+    if engine.is_null() {
+        return;
+    }
+    let engine = &mut *engine;
+    engine.set_tempo(bpm);
 }
 
 #[no_mangle]
