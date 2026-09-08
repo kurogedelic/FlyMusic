@@ -137,6 +137,19 @@ impl Engine {
         self.tick_accumulator = self.tick_accumulator.min(self.tick_interval.saturating_sub(1));
     }
 
+    fn reset_neural(&mut self, seed: u32) {
+        self.rng = Rng::new(seed);
+        for value in &mut self.potential {
+            *value = self.rng.next_f32() * 0.22;
+        }
+        self.input.fill(0.0);
+        self.refractory.fill(0);
+        self.spikes.clear();
+        self.events.clear();
+        self.tick_counter = 0;
+        self.tick_accumulator = 0;
+    }
+
     fn tick(&mut self) {
         self.tick_counter = self.tick_counter.wrapping_add(1);
         let node_count = self.hashes.len();
@@ -464,6 +477,15 @@ pub unsafe extern "C" fn fm_set_tempo(engine: *mut Engine, bpm: u32) {
     }
     let engine = &mut *engine;
     engine.set_tempo(bpm);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fm_reset_neural(engine: *mut Engine, seed: u32) {
+    if engine.is_null() {
+        return;
+    }
+    let engine = &mut *engine;
+    engine.reset_neural(seed);
 }
 
 #[no_mangle]
