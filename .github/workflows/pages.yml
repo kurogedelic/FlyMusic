@@ -1,0 +1,127 @@
+name: FlyMusic
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: flymusic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust WASM target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache source assets
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: flymusic-fafb783-freepats-v1
+
+      - name: Install archive tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full
+
+      - name: Download FlyWire FAFB v783 data
+        run: |
+          mkdir -p .cache/flywire
+          test -s .cache/flywire/coordinates.csv.gz || \
+            curl --fail --location --retry 3 \
+              https://storage.googleapis.com/flywire-data/codex/data/fafb/783/coordinates.csv.gz \
+              --output .cache/flywire/coordinates.csv.gz
+          test -s .cache/flywire/connections.csv.gz || \
+            curl --fail --location --retry 3 \
+              https://storage.googleapis.com/flywire-data/codex/data/fafb/783/connections.csv.gz \
+              --output .cache/flywire/connections.csv.gz
+
+      - name: Build compact connectome
+        run: |
+          mkdir -p dist/data
+          python3 tools/build_data.py .cache/flywire dist/data/fly.bin
+
+      - name: Download CC0 SoundFonts
+        run: |
+          mkdir -p .cache/sf2/piano .cache/sf2/voice dist/sf2
+          if ! find .cache/sf2/piano -type f -iname '*.sf2' -print -quit | grep -q .; then
+            curl --fail --location --retry 3 \
+              https://github.com/freepats/fm-piano2/releases/download/2016-11-12/FM-Piano2-SF2-20161112.7z \
+              --output .cache/piano.7z
+            7z e -y .cache/piano.7z -o.cache/sf2/piano '*.sf2' -r
+          fi
+          if ! find .cache/sf2/voice -type f -iname '*.sf2' -print -quit | grep -q .; then
+            curl --fail --location --retry 3 \
+              https://github.com/freepats/synth-pad-choir/releases/download/2020-05-16/SynthPadChoir-SF2-20200516.7z \
+              --output .cache/voice.7z
+            7z e -y .cache/voice.7z -o.cache/sf2/voice '*.sf2' -r
+          fi
+          cp "$(find .cache/sf2/piano -type f -iname '*.sf2' -print -quit)" dist/sf2/piano.sf2
+          cp "$(find .cache/sf2/voice -type f -iname '*.sf2' -print -quit)" dist/sf2/voice.sf2
+
+      - name: Build WASM engine
+        run: |
+          cargo build --manifest-path engine/Cargo.toml --target wasm32-unknown-unknown --release
+          cp engine/target/wasm32-unknown-unknown/release/flymusic_engine.wasm dist/engine.wasm
+
+      - name: Assemble site
+        run: |
+          cp index.html style.css app.js audio-worklet.js dist/
+          touch dist/.nojekyll
+
+      - name: Validate build
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          required = [
+              'dist/index.html', 'dist/style.css', 'dist/app.js', 'dist/audio-worklet.js',
+              'dist/engine.wasm', 'dist/data/fly.bin', 'dist/sf2/piano.sf2', 'dist/sf2/voice.sf2',
+          ]
+          for name in required:
+              path = Path(name)
+              assert path.is_file() and path.stat().st_size > 0, name
+          assert Path('dist/engine.wasm').read_bytes()[:4] == b'\0asm'
+          assert Path('dist/data/fly.bin').read_bytes()[:4] == b'FLYM'
+          for name in ('dist/sf2/piano.sf2', 'dist/sf2/voice.sf2'):
+              head = Path(name).read_bytes()[:12]
+              assert head[:4] == b'RIFF' and head[8:12] == b'sfbk', name
+          print('Build validated.')
+          PY
+          du -h dist/engine.wasm dist/data/fly.bin dist/sf2/*.sf2
+
+      - name: Configure Pages
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
