@@ -80,6 +80,7 @@ jobs:
           cp "$(find .cache/sf2/piano -type f -iname '*.sf2' -print -quit)" dist/sf2/piano.sf2
           cp "$(find .cache/sf2/voice -type f -iname '*.sf2' -print -quit)" dist/sf2/voice.sf2
           cp "$(find .cache/sf2/drums -type f -iname '*.sf2' -print -quit)" dist/sf2/drums.sf2
+          python3 tools/remap_drums.py dist/sf2/drums.sf2
 
       - name: Build WASM engine
         run: |
