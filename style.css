@@ -33,7 +33,7 @@ body {
   display: grid;
   place-items: center;
   padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
-  background: #000;
+  background: rgba(0, 0, 0, 0.72);
   color: #fff;
 }
 
@@ -154,12 +154,12 @@ button:disabled {
   place-items: center;
   min-height: 40px;
   padding: 7px;
+  font-size: 18px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
-.control-icon ion-icon {
-  width: 20px;
-  height: 20px;
-  font-size: 20px;
+.control-icon > span {
   pointer-events: none;
 }
 
@@ -342,12 +342,7 @@ button:disabled {
   .control-icon {
     min-height: 38px;
     padding: 6px;
-  }
-
-  .control-icon ion-icon {
-    width: 19px;
-    height: 19px;
-    font-size: 19px;
+    font-size: 17px;
   }
 
   .icon-button {
