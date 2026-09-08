@@ -4,7 +4,7 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
     this.wasm = null;
     this.handle = 0;
     this.ready = false;
-    this.bpm = 84;
+    this.bpm = 120;
     this.port.onmessage = (event) => {
       if (event.data?.type === 'init') this.initialize(event.data);
       if (event.data?.type === 'tempo') this.setTempo(event.data.bpm);
@@ -13,7 +13,7 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
   }
 
   setTempo(bpm) {
-    const value = Math.max(40, Math.min(200, Math.round(Number(bpm) || 84)));
+    const value = Math.max(40, Math.min(240, Math.round(Number(bpm) || 120)));
     this.bpm = value;
     if (this.ready && this.wasm?.fm_set_tempo && this.handle) {
       this.wasm.fm_set_tempo(this.handle, value);
@@ -43,6 +43,7 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
 
       const piano = this.copyIntoWasm(data.piano);
       const voice = this.copyIntoWasm(data.voice);
+      const drums = this.copyIntoWasm(data.drums);
       const graph = this.copyIntoWasm(data.graph);
 
       this.handle = this.wasm.fm_create(
@@ -50,6 +51,8 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
         piano.length,
         voice.ptr,
         voice.length,
+        drums.ptr,
+        drums.length,
         graph.ptr,
         graph.length,
         Math.round(sampleRate),
@@ -58,11 +61,12 @@ class FlyMusicProcessor extends AudioWorkletProcessor {
 
       this.wasm.fm_free(piano.ptr, piano.length);
       this.wasm.fm_free(voice.ptr, voice.length);
+      this.wasm.fm_free(drums.ptr, drums.length);
       this.wasm.fm_free(graph.ptr, graph.length);
 
       if (!this.handle) throw new Error('FlyMusic engine initialization failed.');
 
-      this.bpm = Math.max(40, Math.min(200, Math.round(Number(data.bpm) || this.bpm)));
+      this.bpm = Math.max(40, Math.min(240, Math.round(Number(data.bpm) || this.bpm)));
       this.wasm.fm_set_tempo(this.handle, this.bpm);
       this.ready = true;
       this.port.postMessage({ type: 'ready' });
